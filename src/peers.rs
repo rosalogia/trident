@@ -150,16 +150,9 @@ impl Peer {
         self.connection.read(&mut buff)?;
         Ok(HandShake::from_bytes(buff).unwrap())
     }
-
-    pub fn get_bitfield(&mut self) -> std::io::Result<Vec<u8>> {
-        let mut size_header = [0; 4];
-        self.connection.read(&mut size_header)?;
-        let size = ((size_header[0] as u64) << 24 as u64)
-            + ((size_header[1] as u64) << 16 as u64)
-            + ((size_header[2] as u64) << 8 as u64)
-            + (size_header[3] as u64);
-        let mut buff = vec![0; size as usize];
-        self.connection.read(&mut buff)?;
-        Ok(buff)
+    
+    pub fn send_message(&mut self, message: Message) -> std::io::Result<usize> {
+        self.connection.write(&message.as_bytes())
     }
+
 }
