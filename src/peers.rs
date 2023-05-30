@@ -1,3 +1,4 @@
+use crate::bitfield::Bitfield;
 use crate::message::Message;
 use crate::metainfo::Info;
 use std::io::prelude::*;
@@ -65,6 +66,7 @@ pub struct Peer {
     pub peer_id: Option<String>,
     pub connection: TcpStream,
     pub torrent_info: Info,
+    pub bit_field: Option<Bitfield>,
 }
 
 impl Peer {
@@ -79,6 +81,7 @@ impl Peer {
             peer_id: None,
             connection: stream,
             torrent_info,
+            bit_field: None,
         })
     }
 
@@ -141,7 +144,7 @@ impl Peer {
             protocol: String::from("BitTorrent protocol"),
             reserved: vec![0; 8],
             info_hash: info_hash.to_owned(),
-            peer_id: peer_id.as_bytes().to_owned()
+            peer_id: peer_id.as_bytes().to_owned(),
         };
 
         println!("{:?}", handshake.as_bytes());
@@ -150,9 +153,24 @@ impl Peer {
         self.connection.read(&mut buff)?;
         Ok(HandShake::from_bytes(buff).unwrap())
     }
-    
+
+    pub fn get_bitfield(&mut self) -> std::io::Result<bool> {
+        Ok(match self.next_message()? {
+            Message::Bitfield(bitfield_contents) => {
+                self.bit_field = Some(Bitfield::from(bitfield_contents));
+                true
+            }
+            _ => false
+        })
+    }
+
+    pub fn set_piece(&mut self, piece: &usize) -> () {
+        if let Some(bitfield) = &mut self.bit_field {
+            bitfield.set_piece(piece)
+        }
+    }
+
     pub fn send_message(&mut self, message: Message) -> std::io::Result<usize> {
         self.connection.write(&message.as_bytes())
     }
-
 }
