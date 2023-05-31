@@ -1,7 +1,7 @@
 pub struct Bitfield(pub Vec<u8>);
 
 impl Bitfield {
-    pub fn empty(pieces: u32) -> Self {
+    pub fn empty(pieces: usize) -> Self {
         let entries = (pieces as f64 / 8 as f64).ceil() as usize;
         Bitfield(vec![0; entries])
     }
