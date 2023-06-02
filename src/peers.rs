@@ -1,6 +1,10 @@
 use crate::bitfield::Bitfield;
+use crate::download_manager::PieceProgress;
 use crate::message::Message;
 use crate::metainfo::Info;
+use crate::tracker_communication::PeerInfo;
+use crate::BLOCK_SIZE;
+use std::cmp::min;
 use std::io::prelude::*;
 use std::net::TcpStream;
 use std::str;
@@ -67,10 +71,12 @@ pub struct Peer {
     pub connection: TcpStream,
     pub torrent_info: Info,
     pub bit_field: Option<Bitfield>,
+    pub message_backlog: Vec<Message>,
 }
 
 impl Peer {
-    pub fn new(address: String, torrent_info: Info) -> std::io::Result<Self> {
+    pub fn new(peer_info: PeerInfo, torrent_info: Info) -> std::io::Result<Self> {
+        let address = format!("{}:{}", peer_info.ip, peer_info.port);
         let stream = TcpStream::connect(&address)?;
         Ok(Peer {
             am_choking: true,
@@ -82,17 +88,18 @@ impl Peer {
             connection: stream,
             torrent_info,
             bit_field: None,
+            message_backlog: vec![],
         })
     }
 
-    fn int_of_bytes(bytes: &[u8; 4]) -> i32 {
-        (((bytes[0] as u64) << 24 as u64)
+    fn int_of_bytes(bytes: &[u8; 4]) -> u64 {
+        ((bytes[0] as u64) << 24 as u64)
             + ((bytes[1] as u64) << 16 as u64)
             + ((bytes[2] as u64) << 8 as u64)
-            + (bytes[3] as u64)) as i32
+            + (bytes[3] as u64)
     }
 
-    fn next_int(&mut self) -> std::io::Result<i32> {
+    fn next_int(&mut self) -> std::io::Result<u64> {
         let mut buff = [0; 4];
         self.connection.read(&mut buff)?;
         Ok(Self::int_of_bytes(&buff))
@@ -109,11 +116,13 @@ impl Peer {
             3 => Message::NotInterested,
             4 => {
                 let index = self.next_int()?;
+                self.set_piece(&index);
                 Message::Have(index)
             }
             5 => {
                 let mut buff = vec![0; (msg_size - 1) as usize];
                 self.connection.read(&mut buff)?;
+                self.bit_field = Some(Bitfield::from(buff.clone()));
                 Message::Bitfield(buff)
             }
             6 => {
@@ -154,23 +163,55 @@ impl Peer {
         Ok(HandShake::from_bytes(buff).unwrap())
     }
 
-    pub fn get_bitfield(&mut self) -> std::io::Result<bool> {
-        Ok(match self.next_message()? {
-            Message::Bitfield(bitfield_contents) => {
-                self.bit_field = Some(Bitfield::from(bitfield_contents));
-                true
-            }
-            _ => false
-        })
-    }
-
-    pub fn set_piece(&mut self, piece: &usize) -> () {
+    fn set_piece(&mut self, piece: &u64) -> () {
         if let Some(bitfield) = &mut self.bit_field {
             bitfield.set_piece(piece)
         }
     }
 
-    pub fn send_message(&mut self, message: Message) -> std::io::Result<usize> {
+    pub fn has_piece(&self, piece: &u64) -> Option<bool> {
+        self.bit_field.as_ref().map(|bf| bf.has_piece(piece))
+    }
+
+    fn send_message(&mut self, message: Message) -> std::io::Result<usize> {
         self.connection.write(&message.as_bytes())
+    }
+
+    pub fn request_block(&mut self, piece: u64, begin: u64) -> std::io::Result<()> {
+        let size = if begin + BLOCK_SIZE > self.torrent_info.piece_length {
+            self.torrent_info.piece_length % BLOCK_SIZE
+        } else {
+            BLOCK_SIZE
+        };
+
+        self.send_message(Message::Request(piece, begin, size))?;
+        Ok(())
+    }
+
+    pub fn request_piece(&mut self, piece_progress: &mut PieceProgress) -> std::io::Result<()> {
+        let blocks = (self.torrent_info.piece_length as f64 / BLOCK_SIZE as f64).ceil() as u64;
+        for i in 0..blocks {
+            self.request_block(piece_progress.index, i * BLOCK_SIZE)?;
+        }
+
+        for i in 0..blocks {
+            let next_message = self.next_message()?;
+            match next_message {
+                Message::Piece(index, begin, contents) => {
+                    if index == piece_progress.index {
+                        let block_index = (begin / BLOCK_SIZE) as usize;
+                        let reach = min(BLOCK_SIZE as usize, contents.len());
+                        for j in 0..reach {
+                            piece_progress.blocks[block_index][j] = contents[j];
+                        }
+                    }
+                }
+                m => {
+                    self.message_backlog.push(m);
+                }
+            }
+        }
+
+        Ok(())
     }
 }

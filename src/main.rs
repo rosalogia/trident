@@ -1,4 +1,6 @@
 use serde_bencode::de;
+use trident::download_manager;
+use trident::download_manager::DownloadManager;
 use std::env;
 use std::fs;
 use trident::metainfo::*;
@@ -23,34 +25,38 @@ fn main() {
     if response.peers.len() == 0 {
         return;
     }
-    let peer_addr = format!("{}:{}", response.peers[0].ip, response.peers[0].port);
-    let mut peer = Peer::new(peer_addr, mi.info.clone()).unwrap();
-    match peer.handshake(&mi.info_hash(), peer_id) {
-        Ok(response) => {
-            println!("Response: {:?}", response);
-        }
-        Err(e) => {
-            println!("{}", e);
-        }
-    }
 
-    match peer.next_message() {
-        Ok(message) => {
-            println!("Message: {:?}", message);
-        }
-        Err(e) => {
-            println!("{}", e);
-        }
-    }
+    let mut download_manager = DownloadManager::from(mi).unwrap();
+    download_manager.download_pieces(response.peers).unwrap();
 
-    match peer.next_message() {
-        Ok(message) => {
-            println!("Message: {:?}", message);
-        }
-        Err(e) => {
-            println!("{}", e);
-        }
-    }
+
+    // let mut peer = Peer::new(peer_addr, mi.info.clone()).unwrap();
+    // match peer.handshake(&mi.info_hash(), peer_id) {
+    //     Ok(response) => {
+    //         println!("Response: {:?}", response);
+    //     }
+    //     Err(e) => {
+    //         println!("{}", e);
+    //     }
+    // }
+
+    // match peer.next_message() {
+    //     Ok(message) => {
+    //         println!("Message: {:?}", message);
+    //     }
+    //     Err(e) => {
+    //         println!("{}", e);
+    //     }
+    // }
+
+    // match peer.next_message() {
+    //     Ok(message) => {
+    //         println!("Message: {:?}", message);
+    //     }
+    //     Err(e) => {
+    //         println!("{}", e);
+    //     }
+    // }
 
     // match peer.get_bitfield() {
     //     Ok(response) => {

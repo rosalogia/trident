@@ -28,7 +28,7 @@ pub struct TrackerRequest {
 impl TrackerRequest {
     pub fn start_request(torrent: &Torrent, peer_id: String, port: i64) -> Self {
         TrackerRequest {
-            info_hash: torrent.info_hash_urlencoded(),
+            info_hash: torrent.info.info_hash_urlencoded(),
             peer_id,
             port,
             uploaded: 0,

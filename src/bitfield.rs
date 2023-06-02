@@ -10,11 +10,13 @@ impl Bitfield {
         Bitfield(pieces)
     }
 
-    pub fn has_piece(&self, index: &usize) -> bool {
+    pub fn has_piece(&self, index: &u64) -> bool {
+        let index = *index as usize;
         (self.0[index / 8] & (1 << (index % 8))) == 1
     }
 
-    pub fn set_piece(&mut self, index: &usize) -> () {
+    pub fn set_piece(&mut self, index: &u64) -> () {
+        let index = *index as usize;
         self.0[index / 8] = self.0[index / 8] | (1 << (index % 8))
     }
 

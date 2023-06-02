@@ -6,11 +6,11 @@ pub enum Message {
     Unchoke = 1,
     Interested = 2,
     NotInterested = 3,
-    Have(i32) = 4,
+    Have(u64) = 4,
     Bitfield(Vec<u8>) = 5,
-    Request(i32, i32, i32) = 6,
-    Piece(i32, i32, Vec<u8>) = 7,
-    Cancel(i32, i32, i32) = 8,
+    Request(u64, u64, u64) = 6,
+    Piece(u64, u64, Vec<u8>) = 7,
+    Cancel(u64, u64, u64) = 8,
 }
 
 impl Message {

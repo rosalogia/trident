@@ -32,6 +32,22 @@ pub struct Info {
     pub root_hash: Option<String>,
 }
 
+impl Info {
+    pub fn info_bytes(&self) -> Vec<u8> {
+        ser::to_bytes(&self).unwrap()
+    }
+
+    pub fn info_hash(&self) -> Vec<u8> {
+        let mut hasher = Sha1::new();
+        hasher.update(self.info_bytes());
+        let hash = hasher.finalize();
+        hash.to_vec()
+    }
+    pub fn info_hash_urlencoded(&self) -> String {
+        urlencoding::encode_binary(&self.info_hash()).to_string()
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Torrent {
     pub info: Info,
@@ -52,20 +68,4 @@ pub struct Torrent {
     #[serde(default)]
     #[serde(rename = "created by")]
     pub created_by: Option<String>,
-}
-
-impl Torrent {
-    pub fn info_bytes(&self) -> Vec<u8> {
-        ser::to_bytes(&self.info).unwrap()
-    }
-
-    pub fn info_hash(&self) -> Vec<u8> {
-        let mut hasher = Sha1::new();
-        hasher.update(self.info_bytes());
-        let hash = hasher.finalize();
-        hash.to_vec()
-    }
-    pub fn info_hash_urlencoded(&self) -> String {
-        urlencoding::encode_binary(&self.info_hash()).to_string()
-    }
 }
